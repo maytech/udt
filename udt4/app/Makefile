@@ -8,7 +8,12 @@ ifndef arch
    arch = IA32
 endif
 
+ifeq ($(os), SUNOS)
+C++ = CC
+CCFLAGS = -mt -D$(os) -DUNIX -I../src 
+else
 CCFLAGS = -Wall -D$(os) -I../src -finline-functions -O3
+endif
 
 ifeq ($(arch), IA32)
    CCFLAGS += -DIA32 #-mcpu=pentiumpro -march=pentiumpro -mmmx -msse

@@ -249,9 +249,11 @@ int CChannel::sendto(const sockaddr* addr, CPacket& packet) const
       mh.msg_namelen = m_iSockAddrSize;
       mh.msg_iov = (iovec*)packet.m_PacketVector;
       mh.msg_iovlen = 2;
+#ifndef SUNOS
       mh.msg_control = NULL;
       mh.msg_controllen = 0;
       mh.msg_flags = 0;
+#endif
 
       int res = ::sendmsg(m_iSocket, &mh, 0);
    #else
@@ -288,9 +290,11 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
       mh.msg_namelen = m_iSockAddrSize;
       mh.msg_iov = packet.m_PacketVector;
       mh.msg_iovlen = 2;
+#ifndef SUNOS
       mh.msg_control = NULL;
       mh.msg_controllen = 0;
       mh.msg_flags = 0;
+#endif
 
       #ifdef UNIX
          fd_set set;

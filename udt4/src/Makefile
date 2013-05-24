@@ -8,7 +8,12 @@ ifndef arch
    arch = IA32
 endif
 
+ifeq ($(os), SUNOS)
+CCFLAGS = -KPIC -DPIC -D$(os) -DUNIX -mt
+C++ = CC
+else
 CCFLAGS = -fPIC -Wall -Wextra -D$(os) -finline-functions -O3 -fno-strict-aliasing -fvisibility=hidden
+endif
 
 ifeq ($(arch), IA32)
    CCFLAGS += -DIA32
