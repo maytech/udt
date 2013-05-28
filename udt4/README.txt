@@ -24,7 +24,7 @@ CONTENT:
 To make: 
      make -e os=XXX arch=YYY 
 
-XXX: [LINUX(default), BSD, OSX, SUNOS] 
+XXX: [LINUX(default), BSD, OSX, SUNOS, SOLARIS] 
 YYY: [IA32(default), POWERPC, IA64, AMD64] 
 
 For example, on OS X, you may need to do "make -e os=OSX arch=POWERPC"; 
