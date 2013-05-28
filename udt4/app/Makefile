@@ -8,9 +8,9 @@ ifndef arch
    arch = IA32
 endif
 
-ifeq ($(os), SUNOS)
+ifeq ($(os), SOLARIS)
 C++ = CC
-CCFLAGS = -mt -D$(os) -DUNIX -I../src 
+CCFLAGS = -mt -D$(os) -D_XOPEN_SOURCE=1 -D_XOPEN_SOURCE_EXTENDED=1 -D__EXTENSIONS__  -I../src 
 else
 CCFLAGS = -Wall -D$(os) -I../src -finline-functions -O3
 endif
@@ -31,14 +31,14 @@ ifeq ($(arch), SPARC)
    CCFLAGS += -DSPARC
 endif
 
-LDFLAGS = -L../src -ludt -lstdc++ -lpthread -lm
+LDFLAGS = -L../src -ludt -lpthread -lm
 
 ifeq ($(os), UNIX)
    LDFLAGS += -lsocket
 endif
 
-ifeq ($(os), SUNOS)
-   LDFLAGS += -lrt -lsocket
+ifeq ($(os), SOLARIS)
+   LDFLAGS += -lxnet
 endif
 
 DIR = $(shell pwd)

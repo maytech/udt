@@ -8,8 +8,8 @@ ifndef arch
    arch = IA32
 endif
 
-ifeq ($(os), SUNOS)
-CCFLAGS = -KPIC -DPIC -D$(os) -DUNIX -mt
+ifeq ($(os), SOLARIS)
+CCFLAGS = -mt -KPIC -DPIC -D$(os) -D_XOPEN_SOURCE=1 -D_XOPEN_SOURCE_EXTENDED=1 -D__EXTENSIONS__
 C++ = CC
 else
 CCFLAGS = -fPIC -Wall -Wextra -D$(os) -finline-functions -O3 -fno-strict-aliasing -fvisibility=hidden
@@ -47,7 +47,7 @@ libudt.so: $(OBJS)
 ifneq ($(os), OSX)
 	$(C++) -shared -o $@ $^
 else
-	$(C++) -dynamiclib -o libudt.dylib -lstdc++ -lpthread -lm $^
+	$(C++) -dynamiclib -o libudt.dylib -lpthread -lm $^
 endif
 
 libudt.a: $(OBJS)

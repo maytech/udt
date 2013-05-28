@@ -296,7 +296,7 @@ int CChannel::recvfrom(sockaddr* addr, CPacket& packet) const
       mh.msg_flags = 0;
 #endif
 
-      #ifdef UNIX
+      #if defined(SOLARIS) || defined(UNIX)
          fd_set set;
          timeval tv;
          FD_ZERO(&set);
