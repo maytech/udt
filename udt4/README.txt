@@ -25,7 +25,7 @@ To make:
      make -e os=XXX arch=YYY 
 
 XXX: [LINUX(default), BSD, OSX, SUNOS, SOLARIS] 
-YYY: [IA32(default), POWERPC, IA64, AMD64] 
+YYY: [IA32(default), POWERPC, IA64, AMD64, SPARC] 
 
 For example, on OS X, you may need to do "make -e os=OSX arch=POWERPC"; 
 on 32-bit i386 Linux system, simply use "make".
