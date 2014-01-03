@@ -256,18 +256,22 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          FD_ZERO(&readfds);
          FD_ZERO(&writefds);
 
+         int max_fd = 0;
+         
          for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocals.begin(); i != p->second.m_sLocals.end(); ++ i)
          {
             if (lrfds)
                FD_SET(*i, &readfds);
             if (lwfds)
                FD_SET(*i, &writefds);
+            if (*i > max_fd)
+               max_fd = *i;
          }
 
          timeval tv;
          tv.tv_sec = 0;
          tv.tv_usec = 0;
-         if (::select(0, &readfds, &writefds, NULL, &tv) > 0)
+         if (::select(max_fd + 1, &readfds, &writefds, NULL, &tv) > 0)
          {
             for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocals.begin(); i != p->second.m_sLocals.end(); ++ i)
             {
