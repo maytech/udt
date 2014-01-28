@@ -103,6 +103,8 @@ int CEPoll::add_usock(const int eid, const UDTSOCKET& u, const int* events)
       p->second.m_sUDTSocksIn.insert(u);
    if (!events || (*events & UDT_EPOLL_OUT))
       p->second.m_sUDTSocksOut.insert(u);
+   if (!events || (*events & UDT_EPOLL_ERR))
+      p->second.m_sUDTSocksEx.insert(u);
 
    return 0;
 }
@@ -139,11 +141,14 @@ int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
    if (NULL == events){
        p->second.m_sLocalsIn.insert(s);
        p->second.m_sLocalsOut.insert(s);
+       p->second.m_sLocalsErr.insert(s);
    } else {
        if (*events & UDT_EPOLL_IN)
            p->second.m_sLocalsIn.insert(s);
        if (*events & UDT_EPOLL_OUT)
            p->second.m_sLocalsOut.insert(s);
+       if (*events & UDT_EPOLL_ERR)
+           p->second.m_sLocalsErr.insert(s);
    }
 #endif
 
@@ -160,9 +165,11 @@ int CEPoll::remove_usock(const int eid, const UDTSOCKET& u)
    if (p == m_mPolls.end())
       throw CUDTException(5, 13);
 
+   p->second.m_sUDTExcepts.erase(u);
+
+   p->second.m_sUDTSocksEx.erase(u);
    p->second.m_sUDTSocksIn.erase(u);
    p->second.m_sUDTSocksOut.erase(u);
-   p->second.m_sUDTSocksEx.erase(u);
 
    return 0;
 }
@@ -188,9 +195,186 @@ int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
    sock = p->second.m_sLocalsIn.find(s);
    if(sock != p->second.m_sLocalsIn.end())
        p->second.m_sLocalsIn.erase(sock);
+
+   sock = p->second.m_sLocalsErr.find(s);
+   if(sock != p->second.m_sLocalsErr.end())
+       p->second.m_sLocalsErr.erase(sock);
+
 #endif
 
    p->second.m_sLocals.erase(s);
+
+   return 0;
+}
+int CEPoll::wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, std::set<UDTSOCKET>* errorfds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds, std::set<SYSSOCKET>* lwfds, std::set<SYSSOCKET>* lefds)
+{
+   // if all fields is NULL and waiting time is infinite, then this would be a deadlock
+   if (!readfds && !writefds && !errorfds && !lrfds && lwfds && lefds && (msTimeOut < 0))
+      throw CUDTException(5, 3, 0);
+
+   // Clear these sets in case the app forget to do it.
+   if (readfds) readfds->clear();
+   if (writefds) writefds->clear();
+   if (errorfds) errorfds->clear();
+   if (lrfds) lrfds->clear();
+   if (lwfds) lwfds->clear();
+   if (lefds) lefds->clear();
+
+   int total = 0;
+
+
+   int64_t entertime = CTimer::getTime();
+   while (true)
+   {
+      CGuard::enterCS(m_EPollLock);
+
+      map<int, CEPollDesc>::iterator p = m_mPolls.find(eid);
+      if (p == m_mPolls.end())
+      {
+         CGuard::leaveCS(m_EPollLock);
+         throw CUDTException(5, 13);
+      }
+
+      if (p->second.m_sUDTSocksIn.empty() && p->second.m_sUDTSocksOut.empty() && p->second.m_sUDTSocksEx.empty() && p->second.m_sLocals.empty() && (msTimeOut < 0))
+      {
+         // no socket is being monitored, this may be a deadlock
+         CGuard::leaveCS(m_EPollLock);
+         throw CUDTException(5, 3);
+      }
+
+      // Sockets with exceptions are returned to both read and write sets.
+      if ((NULL != errorfds) && !p->second.m_sUDTExcepts.empty())
+      {
+         *errorfds = p->second.m_sUDTExcepts;
+         // for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
+         //    errorfds->insert(*i);
+         total += p->second.m_sUDTExcepts.size();
+      }
+      if ((NULL != readfds) && !p->second.m_sUDTReads.empty())
+      {
+         *readfds = p->second.m_sUDTReads;
+         // for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
+         //    readfds->insert(*i);
+         total += p->second.m_sUDTReads.size();
+      }
+      if ((NULL != writefds) && !p->second.m_sUDTWrites.empty())
+      {
+         *writefds = p->second.m_sUDTWrites;
+         // for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
+         //    writefds->insert(*i);
+         total += p->second.m_sUDTWrites.size();
+      }
+
+      if (lrfds || lwfds)
+      {
+         #ifdef LINUX
+         const int max_events = p->second.m_sLocals.size();
+         epoll_event ev[max_events];
+         int nfds = ::epoll_wait(p->second.m_iLocalID, ev, max_events, 0);
+
+         for (int i = 0; i < nfds; ++ i)
+         {
+            if ((NULL != lrfds) && (ev[i].events & EPOLLIN))
+           {
+               lrfds->insert(ev[i].data.fd);
+               ++ total;
+            }
+            if ((NULL != lwfds) && (ev[i].events & EPOLLOUT))
+            {
+               lwfds->insert(ev[i].data.fd);
+               ++ total;
+            }
+            if ((NULL != lefds) && (ev[i].events & EPOLLERR))
+            {
+               lefds->insert(ev[i].data.fd);
+               ++ total;
+            }
+         }
+         #else
+         //currently "select" is used for all non-Linux platforms.
+         //faster approaches can be applied for specific systems in the future.
+
+         //"select" has a limitation on the number of sockets
+
+         fd_set readfds;
+         fd_set writefds;
+         fd_set errorfds;
+         FD_ZERO(&readfds);
+         FD_ZERO(&writefds);
+         FD_ZERO(&errorfds);
+
+         int max_fd = 0;
+
+         if (lwfds)
+            for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsOut.begin(); i != p->second.m_sLocalsOut.end(); ++ i)
+            {
+               FD_SET(*i, &writefds);
+               if (*i > max_fd)
+                  max_fd = *i;
+            }
+
+         if (lrfds)
+            for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsIn.begin(); i != p->second.m_sLocalsIn.end(); ++ i)
+            {
+               FD_SET(*i, &readfds);
+               if (*i > max_fd)
+                  max_fd = *i;
+            }
+
+         if (lefds)
+            for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsErr.begin(); i != p->second.m_sLocalsErr.end(); ++ i)
+            {
+               FD_SET(*i, &errorfds);
+               if (*i > max_fd)
+                  max_fd = *i;
+            }
+
+         timeval tv;
+         tv.tv_sec = 0;
+         tv.tv_usec = 0;
+         if (::select(max_fd + 1, &readfds, &writefds, &errorfds, &tv) > 0)
+         {
+            if (lwfds)
+               for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsOut.begin(); i != p->second.m_sLocalsOut.end(); ++ i)
+               {
+                  if (FD_ISSET(*i, &writefds))
+                  {
+                     lwfds->insert(*i);
+                     ++ total;
+                  }
+               }
+            if (lrfds)
+               for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsIn.begin(); i != p->second.m_sLocalsIn.end(); ++ i)
+               {
+                  if (FD_ISSET(*i, &readfds))
+                  {
+                     lrfds->insert(*i);
+                     ++ total;
+                  }
+               }
+            if (lefds)
+               for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsErr.begin(); i != p->second.m_sLocalsErr.end(); ++ i)
+               {
+                  if (FD_ISSET(*i, &errorfds))
+                  {
+                     lefds->insert(*i);
+                     ++ total;
+                  }
+               }
+         }
+         #endif
+      }
+
+      CGuard::leaveCS(m_EPollLock);
+
+      if (total > 0)
+         return total;
+
+      if ((msTimeOut >= 0) && (int64_t(CTimer::getTime() - entertime) >= msTimeOut * 1000LL))
+         throw CUDTException(6, 3, 0);
+
+      CTimer::waitForEvent();
+   }
 
    return 0;
 }
@@ -244,7 +428,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
       }
 
-      if (lrfds || lwfds)
+      if (lrfds || lwfds )
       {
          #ifdef LINUX
          const int max_events = p->second.m_sLocals.size();
@@ -276,7 +460,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          FD_ZERO(&writefds);
 
          int max_fd = 0;
-         
+
          if (lwfds)
             for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocalsOut.begin(); i != p->second.m_sLocalsOut.end(); ++ i)
             {

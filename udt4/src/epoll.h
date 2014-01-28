@@ -59,6 +59,7 @@ struct CEPollDesc
 
    std::set<SYSSOCKET> m_sLocalsOut;         // set of local (non-UDT) descriptors
    std::set<SYSSOCKET> m_sLocalsIn;          // set of local (non-UDT) descriptors
+   std::set<SYSSOCKET> m_sLocalsErr;          // set of local (non-UDT) descriptors
 
    std::set<UDTSOCKET> m_sUDTWrites;         // UDT sockets ready for write
    std::set<UDTSOCKET> m_sUDTReads;          // UDT sockets ready for read
@@ -140,6 +141,22 @@ public: // for CUDTUnited API
       //    number of sockets available for IO.
 
    int wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds, std::set<SYSSOCKET>* lwfds);
+
+      // Functionality:
+      //    wait for EPoll events or timeout.
+      // Parameters:
+      //    0) [in] eid: EPoll ID.
+      //    1) [out] readfds: UDT sockets available for reading.
+      //    2) [out] writefds: UDT sockets available for writing.
+      //    3) [err] errorfds: UDT sockets error.
+      //    4) [in] msTimeOut: timeout threshold, in milliseconds.
+      //    5) [out] lrfds: system file descriptors for reading.
+      //    6) [out] lwfds: system file descriptors for writing.
+      //    7) [err] lefds: system file descriptors error.
+      // Returned value:
+      //    number of sockets available for IO.
+
+   int wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, std::set<UDTSOCKET>* errorfds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds, std::set<SYSSOCKET>* lwfds, std::set<SYSSOCKET>* lefds);
 
       // Functionality:
       //    close and release an EPoll.

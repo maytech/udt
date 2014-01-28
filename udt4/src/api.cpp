@@ -494,7 +494,7 @@ UDTSTATUS CUDTUnited::getStatus(const UDTSOCKET u)
    if (i->second->m_pUDT->m_bBroken)
       return BROKEN;
 
-   return i->second->m_Status;   
+   return i->second->m_Status;
 }
 
 int CUDTUnited::bind(const UDTSOCKET u, const sockaddr* name, int namelen)
@@ -1136,6 +1136,11 @@ int CUDTUnited::epoll_wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET
    return m_EPoll.wait(eid, readfds, writefds, msTimeOut, lrfds, lwfds);
 }
 
+int CUDTUnited::epoll_wait(const int eid, std::set<UDTSOCKET>* readfds, std::set<UDTSOCKET>* writefds, std::set<UDTSOCKET>* errorfds, int64_t msTimeOut, std::set<SYSSOCKET>* lrfds, std::set<SYSSOCKET>* lwfds, std::set<SYSSOCKET>* lefds)
+{
+   return m_EPoll.wait(eid, readfds, writefds, errorfds, msTimeOut, lrfds, lwfds, lefds);
+}
+
 int CUDTUnited::epoll_release(const int eid)
 {
    return m_EPoll.release(eid);
@@ -1226,7 +1231,7 @@ void CUDTUnited::checkBrokenSockets()
    {
       if (j->second->m_pUDT->m_ullLingerExpiration > 0)
       {
-         // asynchronous close: 
+         // asynchronous close:
          if ((NULL == j->second->m_pUDT->m_pSndBuffer) || (0 == j->second->m_pUDT->m_pSndBuffer->getCurrBufSize()) || (j->second->m_pUDT->m_ullLingerExpiration <= CTimer::getTime()))
          {
             j->second->m_pUDT->m_ullLingerExpiration = 0;
@@ -2084,6 +2089,24 @@ int CUDT::epoll_wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* wri
    }
 }
 
+int CUDT::epoll_wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, set<UDTSOCKET>* errorfds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds, set<SYSSOCKET>* lefds)
+{
+   try
+   {
+      return s_UDTUnited.epoll_wait(eid, readfds, writefds, errorfds, msTimeOut, lrfds, lwfds, lefds);
+   }
+   catch (CUDTException e)
+   {
+      s_UDTUnited.setError(new CUDTException(e));
+      return ERROR;
+   }
+   catch (...)
+   {
+      s_UDTUnited.setError(new CUDTException(-1, 0, 0));
+      return ERROR;
+   }
+}
+
 int CUDT::epoll_release(const int eid)
 {
    try
@@ -2307,6 +2330,11 @@ int epoll_remove_ssock(int eid, SYSSOCKET s)
 int epoll_wait(int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds)
 {
    return CUDT::epoll_wait(eid, readfds, writefds, msTimeOut, lrfds, lwfds);
+}
+
+int epoll_wait(int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefds, set<UDTSOCKET>* errorfds, int64_t msTimeOut, set<SYSSOCKET>* lrfds, set<SYSSOCKET>* lwfds, set<SYSSOCKET>* lefds)
+{
+   return CUDT::epoll_wait(eid, readfds, writefds, errorfds, msTimeOut, lrfds, lwfds, lefds);
 }
 
 #define SET_RESULT(val, num, fds, it) \
