@@ -148,11 +148,11 @@ public: // for CUDTUnited API
       //    0) [in] eid: EPoll ID.
       //    1) [out] readfds: UDT sockets available for reading.
       //    2) [out] writefds: UDT sockets available for writing.
-      //    3) [err] errorfds: UDT sockets error.
+      //    3) [out] errorfds: UDT sockets error.
       //    4) [in] msTimeOut: timeout threshold, in milliseconds.
       //    5) [out] lrfds: system file descriptors for reading.
       //    6) [out] lwfds: system file descriptors for writing.
-      //    7) [err] lefds: system file descriptors error.
+      //    7) [out] lefds: system file descriptors error.
       // Returned value:
       //    number of sockets available for IO.
 
