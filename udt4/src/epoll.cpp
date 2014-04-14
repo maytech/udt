@@ -166,6 +166,8 @@ int CEPoll::remove_usock(const int eid, const UDTSOCKET& u)
       throw CUDTException(5, 13);
 
    p->second.m_sUDTExcepts.erase(u);
+   p->second.m_sUDTReads.erase(u);
+   p->second.m_sUDTWrites.erase(u);
 
    p->second.m_sUDTSocksEx.erase(u);
    p->second.m_sUDTSocksIn.erase(u);
